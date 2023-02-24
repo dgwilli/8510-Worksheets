@@ -36,7 +36,7 @@ data(gapminder)
 
 (@) Take a look at the data. What can you say about it? 
 
-> The data appears to show the life expectancy for nations from 1952 to 2007, with observations recorded every five years. Each observation also includes the population and GDP for the country in that specific year. 
+> The data shows the life expectancy for nations from 1952 to 2007, with observations recorded at five-year intervals. Each observation also includes the population and GDP for the country in that specific year. 
 
 This data includes variables for life exptenency and per capita GDP. Lets say we want to plot these two variables against each other for all country-years within the dataset. First we have to tell `ggplot()` what our data is. 
 ```{r}
@@ -165,7 +165,7 @@ religious_spots <- gayguides %>%
   summarize(Locations = n())
 ```
 ```{r}
-ggplot(religious_spots, aes(x = state, y = Locations)) + geom_col() + ggtitle("Gay Guides Locations by State") + labs(x="States",y="Number of Locations")
+ggplot(religious_spots, aes(x = state, y = Locations)) + geom_col() + ggtitle("Gay Guides Religious Locations by State") + labs(x="States",y="Number of Locations")
 ```
 
 (@) Formulate a question based on a dataset of your choice. That question should be something that would be appropriately answered by a bar chart. What is the question you want to explore?
@@ -264,7 +264,23 @@ ggplot(gg_locations, aes(x=Year, y=count)) + geom_line() + facet_wrap(~type) + s
 
 (@) Using this recreation dataset from last week, can you find the average number of volunteer and paid workers over time? 
 ```{r}
-rec.workers <- read.csv("https://github.com/regan008/DigitalMethodsData/blob/main/raw/RecreationData-Wide.csv")
+rec.workers <- read.csv("https://raw.githubusercontent.com/regan008/DigitalMethodsData/main/raw/RecreationData-Wide.csv")
+```
+```{r}
+rec.workers <- rec.workers %>%
+  pivot_longer(!city:type_of_worker, names_to = "year", values_to = "count")
+```
+```{r}
+rec.workers <- rec.workers %>%
+  select(type_of_worker, year, count) %>%
+  group_by(type_of_worker, year)
+```
+```{r}
+rec.workers <- na.omit(rec.workers)
+```
+
+```{r}
+ggplot(rec.workers, aes(x=year, y=count)) + geom_line() + facet_wrap(~type_of_worker)
 ```
 
 ### Practice
@@ -306,8 +322,26 @@ ggplot(judge_races_and_ethnicities, aes(x=Race.or.Ethnicity, y=Appointees, color
 (@) Plot 3. For this one, try a different kind of plot. [Check out a useful gallery here.](https://github.com/regan008/DigitalMethodsData/blob/main/raw/RecreationData-Wide.csv)
 (For this week, avoid choosing a map. We'll talk more about maps and geographic data over the next two weeks.)
 ```{r}
+data("charlestonManumissions")
+```
 
+```{r}
+motive <- charlestonManumissions %>%
+  select(Motive, Date) %>%
+  filter(grepl("1776|1777|1778|1779", Date)) %>%
+  group_by(Motive) %>%
+  summarize(Count = n())
+```
+```{r}
+ggplot(motive, aes(x="", y=Count, fill=Motive)) + 
+  geom_bar(stat = "identity", width=1) + 
+  coord_polar("y", start = 0) + 
+  ggtitle("Motives for Charleston Manumissions, 1776-1779") + 
+  theme_void() + 
+  geom_text(aes(label = Count), position = position_stack(vjust = 0.5)) + 
+  scale_fill_brewer(palette="Set1") +
+  labs(caption = "Based on 29 total observations within the specified range of years.")
 ```
 
 (@) Plot 3 explanation: 
->
+>I wanted to see what the motives were for manumissions over a four-year period in the "Charleston Manumissions" dataset and whether they were more of a moral or financial nature (it's the former). The range of years was chosen at random. I chose a pie chart because I felt it would offer a compelling visual representation of this data. I chose to void certain elements--namely, the y- and x-axis titles, to free the chart of clutter and ensure its easy readability. 
