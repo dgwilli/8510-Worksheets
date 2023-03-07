@@ -1,0 +1,135 @@
+---
+title: "Exploratory Data Analysis"
+author: "David Williams"
+output: html_document
+date: "2023-03-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+>Step 1: Formulate your question
+
+>I would like to explore whether Democrats or Republicans have had more U.S. District Court judges over the last 50 years. I would also like to know which cities the majority of those judges were born in during that span.  
+
+>Step 2: Read in the data
+
+```{r}
+library(DigitalMethodsData)
+library("tidyverse")
+data("judges")
+```
+
+>Step 3: Check the packaging
+
+```{r}
+nrow(judges)
+
+ncol(judges)
+```
+
+>Step 4: Run str()
+
+```{r}
+str(judges)
+```
+
+>Step 5: Look at the top and bottom of the data
+
+```{r}
+head(judges)
+```
+```{r}
+tail(judges)
+```
+
+>Step 6: Check your "n"s
+
+```{r}
+judge_count <- judges %>% select(Last.Name, First.Name, Birth.City, Birth.State, Court.Type..1., Court.Name..1., Party.of.Appointing.President..1., Confirmation.Date..1.)
+```
+```{r}
+judge_count <- judge_count %>%
+  filter(Confirmation.Date..1. > 1973-01-01) %>%
+  filter(grepl("U.S. District Court", Court.Name..1.))
+```
+
+
+>Step 7: Validate with at least one external data source
+
+>I located the following dataset that I can use to calculate the total number of District Court judges appointed during each presidency: https://www.uscourts.gov/sites/default/files/apptsbypres.pdf. This can very easily be used to check the total number of judge appointments over a period of time, as well as the number per Republican or Democratic administration. 
+
+>Step 8: Try the easy solution first
+
+
+```{r}
+judge_count <- judge_count %>%
+  group_by(Birth.City, Birth.State, Party.of.Appointing.President..1.) %>%
+  summarize(count = n())
+```
+
+```{r}
+judge_count <- judge_count %>%
+  arrange(desc(count))
+```
+
+```{r}
+judge_count <- judge_count %>%
+  pivot_wider(names_from = Party.of.Appointing.President..1., values_from = count)
+```
+
+```{r}
+judge_count %>%
+  arrange(desc(Republican))
+```
+
+```{r}
+judge_count %>%
+  arrange(desc(Democratic))
+```
+
+>Step 9: Challenge your solution
+
+>For this step, I selected a random sample from the dataset (300 rows) and arranged the results the same way I did in the previous step. The order of cities is consistent, which leads me to conclude that the coding in step #8 is correct. 
+
+```{r}
+random <- judge_count[sample(1:nrow(judge_count), 300), ]
+```
+
+```{r}
+random %>%
+  arrange(desc(Republican))
+```
+
+```{r}
+random %>%
+  arrange(desc(Democratic))
+```
+
+>Step 10: Follow-up 
+
+>The question I originally had was about politial representation among District Court judges. While appointing judges along party lines is common practice, the dataset used for this EDA only lists the parties of the *appointing presidents,* not the judges themselves. Therefore, it's fair to speculate whether the given data is appropriate for answering this question. It would be more accurate if the political party for *each judge* was listed (even if, again, the results would likely be about the same).  
+
+
+
