@@ -1,0 +1,444 @@
+---
+title: 'Worksheet 5: Mapping'
+author: "David Williams"
+date: "March 28, 2023"
+---
+
+_This is the fifth in a series of worksheets for History 8510 at Clemson University. The goal of these worksheets is simple: practice, practice, practice. The worksheet introduces concepts and techniques and includes prompts for you to practice in this interactive document. When you are finished, you should change the author name (above), knit your document, and upload it to canvas. Don't forget to commit your changes as you go and push to github when you finish the worksheet._
+
+## Mapping with `ggmap()` and `ggplot2()`
+
+There are many different mapping packages for R. That means there is no single way to create a map in R. Different packages have different strengths and weaknesses and your use of them will depend on your goals and the historical questions you would like to ask. If your project is highly map centric - it may be better suited to ArcGIS which we will not cover in this class. 
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2) 
+library(tidyverse)
+library(DigitalMethodsData)
+library(ggmap)
+library(tidygeocoder)
+```
+
+### Geocoding
+The first step in any project is to create geographical data. Depending on the time period you study and the nature of the data, this may or may not be able to be automated. The process of associating geographical coordinates (latitude/longitude) with data is called **geocoding**. There are numerous avenues and services for performing this service. Google Maps and Open Street Maps are the two most common. These services accept an address and return latitude and longitude coordinates. Google Maps does require an API Key which you can sign up for. Typically geocoding with Google costs .5 cents per entry but when you sign up with them, you get $300 in credit per year (at least at the time of writing this - that may change). Although we geocode a very large amount of data with Google on Mapping the Gay Guides, I've never been charged for geocoding. 
+
+However, for the purposes of this class we're going to use Open Street Map's geocoding API because it is open source and therefore free. 
+
+To use the geocoding service, lets first load some data. We'll use the recreation data that we used last week. 
+```{r}
+rec.data <- read.csv("https://raw.githubusercontent.com/regan008/DigitalMethodsData/main/raw/Recreation-Expenditures.csv")
+head(rec.data)
+```
+Notice in this dataset we have the city state and year but no geographical coordinates if we wanted to map this data. Even if we don't have an exact street address, we can still geocode this data to get coordinates. The function to do that is `geocode()` and we can pass it a city and street. Note the method option, which designates which geocoding service we want to use. 
+```{r}
+rec.data.coordinates <- rec.data %>% geocode(city = city, state = state, method='osm', lat = latitude, long = longitude)
+head(rec.data.coordinates)
+```
+Now we have latitude and longitude coordinates for our data. 
+
+(@) Use this approach to geocode the `UndergroundRR` data. 
+```{r}
+data("UndergroundRR")
+```
+
+```{r}
+UndergroundRR.coordinates <- undergroundRR %>% geocode(city = City, state = State, method='osm', lat = latitude, long = longitude)
+head(UndergroundRR.coordinates)
+```
+
+
+(@) Geocode the Boston Women Voters dataset. Note that the data does include street addresses but because they are broken into parts - street address number, street, etc - you'll need to combine them into a full address to pass to the geocoding function. 
+```{r}
+data("BostonWomenVoters")
+```
+```{r}
+New.BWV <- unite(BostonWomenVoters, street, c(Street.Number.on.April.1, Street.of.Residence.on.April.1), sep = " ")
+head(New.BWV)
+```
+```{r}
+New.BWV$city = "Boston"
+```
+
+```{r}
+New.BWV <- New.BWV[1:150, ]
+```
+```{r}
+BWV.coordinates <- New.BWV %>% geocode(street = street, city = city, method='osm', lat = lat, long = long)
+head(BWV.coordinates)
+```
+
+(@) As mentioned above - there are many ways to make a map in R. The `ggmap()` package has a function called `qmplot()` which allows for the quick plotting of maps with data. Look up the documentation for this package and use it to create a plot of the recreational data that we gecode above.
+```{r}
+qmplot(longitude, latitude, data = rec.data.coordinates, maptype = "toner-lite", color = I("red") )
+```
+
+### Maps with `ggplot()`
+
+Just like charts in ggplot, maps in ggplot are plotted using a variety of layers. To build a map we need to supply it with geographic data that can use to plot a base map. Your base map will differ depending on the scale of your data, the questions you are asking, and your area of study. For the purposes of this worksheet lets map the gay guides data. Typically you'd need to geocode this data first, but this data has already been geolocated for you. 
+
+First we need to get a basemap. For this example we'll use the `map_data()` function which turns data from the `maps` package into a data frame that is suitable for plotting with ggplot. 
+
+(@) Look at the documentation for `map_data()`. Which geographies does this package provide access to?
+
+>It provides access to counties, states, the US, the world, Italy, France, and New Zealand.
+
+Lets load the base map data for the US. 
+```{r}
+usa <- map_data("state")
+```
+
+(@) `map_data()` generates a data frame. Take a look at this data frame, what types of data are included? 
+
+>It contains a geographical breakdown of each state by longitute and latitude. 
+
+We can now pass this data to ggplot to create a simple basemap. When we wanted to create a bar plot using `ggplot()` we called `geom_bar`. When we wanted to create a line chart we used `geom_point()` and `geom_line()`. The sample principle applies here and `ggplot()` provides a geom for maps.
+```{r}
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region))
+```
+
+Now we have a basemap! But what if we want to layer data onto it. Lets add all of the locations in `gayguides` from 1965. First we need to set up our data: 
+```{r}
+data(gayguides)
+gayguides <- gayguides %>% filter(Year == 1965)
+```
+
+And then we can use the same mapping code from above but this time we're going to add an additional geom -- `geom_point()` which will point to each of our locations from 1965. 
+```{r}
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region)) +
+  geom_point(data = gayguides, mapping = aes(x=lon, y=lat))
+```
+
+(@) This map looks slightly funny, but that is because the data includes entries outside of the contiguous United States. Try filtering out those entries and mapping this again. Can you change the color or size of the points? Can you add a title?
+```{r}
+gayguides <- gayguides %>%
+  filter(lat > 23)
+```
+```{r}
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region)) +
+  geom_point(data = gayguides, mapping = aes(x=lon, y=lat), color="blue", size = 1) +
+  ggtitle("Gay Guides: Locations in America, 1965")
+```
+
+(@) Can you map just locations in South Carolina (on a basemap of SC)? 
+
+```{r}
+usa <- usa %>%
+  filter(region == "south carolina")
+```
+
+```{r}
+gayguides <- gayguides %>%
+  filter(state == "SC")
+```
+
+```{r}
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region)) +
+  geom_point(data = gayguides, mapping = aes(x=lon, y=lat), color="red", size = 2)
+```
+
+(@) Create a map that uses your geocoded data from the Boston Women Voters dataset. 
+```{r}
+BWV.coordinates <- BWV.coordinates[1:150, ]
+```
+```{r}
+usa <- map_data("state")
+usa <- usa %>%
+  filter(region == "massachusetts")
+```
+```{r}
+BWV.coordinates <- BWV.coordinates %>%
+  filter(long < 0 & Present.Residence != "131 Lenox Street")
+
+#I added the filter above because there were two points whose coordinates fell well outside the state of Massachusetts. This was causing significant distortion when generating the map.  
+```
+
+```{r}
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region)) +
+  geom_point(data = BWV.coordinates, mapping = aes(x=long, y=lat), color = "red")
+```
+
+Lets return to the recreational data for a minute.
+
+```{r}
+head(rec.data.coordinates)
+```
+One interesting way to visualize this map might be to plot each location as a point on the map but to use the total_expenditures values to determine the size of the points. 
+
+We can do that by making a small adjustment to the map we made previously. First lets recreate a basic map of all these locations using `ggplot()`
+```{r}
+usa <- map_data("state")
+
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region)) +
+  geom_point(data = rec.data.coordinates, mapping = aes(x=longitude, y=latitude))
+```
+
+```{r}
+ggplot() + 
+  geom_map( data = usa, map = usa, aes(long, lat, map_id=region), fill="white", color="gray") +
+  geom_point(data = rec.data.coordinates, mapping = aes(x=longitude, y=latitude, size=total_expenditures))
+```
+
+```{r}
+library(readr) #you may have to install it using `install.packages()`. 
+library(rgdal)
+library(sf)
+library(maptools)
+library(ipumsr)
+#NHGIS data is stored in zip files. R has functions for dealing with these but we still need to download the file to our server. Here we're going to write a function that will create a new directory, download the data, and rename it. 
+dir.create("data/", showWarnings = FALSE)
+get_data <- function(x) {
+  download.file("https://github.com/regan008/DigitalMethodsData/blob/main/raw/nhgis0005_shape_simplified.zip?raw=true", "data/nhgis_simplified_shape.zip")
+  download.file("https://github.com/regan008/DigitalMethodsData/blob/main/raw/nhgis0005_csv.zip?raw=true", "data/nhgis_data.zip")
+}
+get_data()
+# Change these filepaths to the filepaths of your downloaded extract
+nhgis_csv_file <- "data/nhgis_data.zip"
+nhgis_shp_file <- "data/nhgis_simplified_shape.zip"
+#load the data and shape file into read_nhgis_sf
+nhgis <- read_nhgis_sf(
+  data_file = nhgis_csv_file,
+  shape_file = nhgis_shp_file
+)
+#filter nhgis so that the map focuses on the 48 contiguous states. 
+nhgis <- nhgis %>% filter(STATENAM != "Alaska Territory" & STATENAM != "Hawaii Territory")
+#plot 
+ggplot(data = nhgis, aes(fill = AZF001)) +
+  geom_sf() 
+```
+(@) In the code above, why filter out Hawaii and Alaska? Try uncommenting that line and rerunning the code. What happens? Why might we want to do this? Why might we not want to do this? How does it shape the interpretation?
+
+>When I uncomment the line, Hawaii and Alaska are included in the visualization, which greatly condenses the view of the other American states. This is because both are located far away from the mainland US. The result is that much of the data (i.e., the aeshetics of the States) is harder to see and read on a cartesian coordinate graph. For this reason, they are filtered out, which should be taken into account when formulating observations/conclusions based on this data. 
+
+>However, if we want to include Hawaii and Alaska for greater accuracy, it is my understanding that the "usmap" package will allow both to be displayed without causing the distortion I described earlier. If we're trying to accurately provide data from *all* 50 states, this would be the way to go. 
+
+This is a great start. But using AZF001 (Native born males) as the fill does not create a useful visualization. It doesn't give us a sense of the proportion of that data. What would be much better, is if we knew what percentage of the total population foreign born males represented. To get that we have to calculate it. The next few questions will walk build on the code above and walk you through doing this.
+
+(@) First, create a variable called total_male_pop, with the total foreign and native born male population by summing the variables AZF001 and AZF003. 
+```{r}
+nhgis$total_male_pop <- nhgis$AZF001 + nhgis$AZF003
+```
+
+(@) Now, use the total_male_pop variable and create a variable for the the percentage of foreign born males.
+```{r}
+library(scales)
+
+nhgis <- nhgis %>%
+  mutate(foreign_males_percent = percent(AZF003/total_male_pop))
+```
+```{r}
+nhgis$foreign_males_percent <- as.numeric(gsub("%", "", nhgis$foreign_males_percent))
+```
+
+(@) Now map your result. You'll want to replicate the code from the example above, but this time add another layer to the plot - a scale. Here we'll use this scale `scale_fill_continuous("", labels = scales::percent)`
+
+Before you write that code, look up the documentation for the above code (and look at the examples). What does it do? 
+
+>It maps data values using color/fill aesthetics. 
+
+Now create the map:
+
+```{r}
+ggplot(data = nhgis, aes(fill = as.numeric(foreign_males_percent))) +
+  geom_sf() +
+  scale_fill_continuous("", labels = scales::percent)
+```
+
+### Leaflet
+
+In recent years Leaflet has become the most popular open source Javascript library for mapping. In comparison to `ggplot()` the advantage of leaflet is its interactivity. It allows you to zoom in, have pop ups, etc. While `ggplot()` is a powerful tool for static maps and would be useful for a book or journal article, leaflet would make a useful addition to an online digital component.
+
+Like `ggplot()` it works by layering information on top of a basemap. You begin by loading the library and invoking leaflet. 
+```{r}
+library(leaflet)
+my.map <- leaflet()
+my.map
+```
+Now that we've got a leaflet object created, we can add layers to it starting with a basemap. 
+```{r}
+my.map %>% addTiles()
+```
+Leaflet refers to tiles - these are sort of like base maps. Next we need to add coordinates. In this example, lets use the coordinates for Dr. Regan's office. 
+```{r}
+my.map %>% addTiles() %>% addMarkers(lng=-82.836856, lat=34.678286, popup = "Hardin 004")
+```
+
+We could also do this with a data frame. Notice that in this example, we use the leaflet function and call the data inside rather than passing the function coordinates manually. We then use the paste function to build out text for a pop up.
+```{r}
+leaflet(data=rec.data.coordinates) %>% addTiles() %>% addMarkers(~longitude, ~latitude, popup = paste("The total expenditures in ", rec.data.coordinates$city, ", ", rec.data.coordinates$state, " were ",  rec.data.coordinates$total_expenditures, sep=""))
+```
+
+(@) Use leaflet to map a dataset of your choice: 
+```{r}
+data("gayguides")
+```
+```{r}
+gayguides <- gayguides %>%
+  filter(state == "SC" & Year == "1985")
+```
+```{r}
+leaflet(data=gayguides) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste("The location is listed under ", gayguides$type, sep=""))
+```
+
+(@) Explain what choices you made in building this map? Why might you use leaflet over ggplot? When would ggplot be more desirable? 
+
+>I first filtered the original dataset to more easily answer a particular historical question (in this case, getting a look at the locations in South Carolina in 1985). For the markers, I specified that I would like to see the location type given in the dataset. In a case such as this, the leaflet would be preferrable since my research question is predicated on having descriptive information readily available. It's not enough to see the number of locations. I'm trying to ascertain which were bars, hotels, and so forth. A ggplot would be a good option if I have a more simplified historical question. For example, let's say that I want to use a visualization to determine how many locations were in South Carolina versus California in 1985. My question is strictly quantitative in nature, so a ggplot, which is simpler in design, would serve me just fine. 
+
+### Exercises
+For the next portion of this worksheet I'd like you to look back at the email about the National Parks Data. Using this data (link below) you should use ggplot (charts, maps) and other mapping tools to come up with several ways to visualize it based on the points outlined in Dr. Barczewski's email. You should try to think about this from the perspective of her larger book project, how could you visualize this data to help her make a compelling argument? 
+
+```{r}
+parks <- read.csv("https://raw.githubusercontent.com/regan008/DigitalMethodsData/main/raw/parks-geocoded.csv")
+```
+
+
+```{r}
+#I've provided annotations throughout to justify some of the choices I made with regards to how this data should be visualized to answer as many of Dr. Barczewski's questions as possible. 
+
+European_parks <- parks %>%
+  select(park, country, lon, lat, distance_from_closest_city) %>%
+  filter(country != "United States" & country != "New Zealand" & country != "Canada" & country != "United Kingdom" & country != "South Africa")
+```
+
+```{r}
+leaflet(data=European_parks) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste(European_parks$park , " is ", European_parks$distance_from_closest_city, " miles from the closest city", sep=""))
+```
+
+```{r}
+British_parks <- parks %>%
+  select(park, country, lon, lat, distance_from_closest_city, total_sq_kilometers) %>%
+  filter(country == "United Kingdom")
+```
+
+```{r}
+leaflet(data=British_parks) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste(British_parks$park , " is ", British_parks$distance_from_closest_city, " miles from the closest city", sep=""))
+```
+
+
+```{r}
+Brit_and_European_parks <- parks %>%
+  select(country, park, total_sq_kilometers, year) %>%
+  filter(country != "United States" & country != "Canada" & country != "New Zealand" & country != "South Africa") %>%
+  group_by(country) %>%
+  summarize(Average = mean(as.numeric(total_sq_kilometers)))
+```
+```{r}
+ggplot(Brit_and_European_parks, aes(x=country, y=Average)) + geom_col() + labs(x="Nations",y="Average Park Size in Kilometers") + ggtitle("British vs. European Parks: Size Comparisons") + theme(axis.text.x = element_text(angle = 90))
+
+#The contrast in size between British and other European is a pretty general question, so I think a bar chart representing averages would suffice. There are so many observations in the dataset, and bundling much of it together makes visualization easier and clearer. 
+```
+
+
+```{r}
+American_and_Brit_parks <- parks %>%
+  select(country, park, total_sq_kilometers, year) %>%
+  filter(country == "United States" | country == "United Kingdom") %>%
+  group_by(country) %>%
+  summarize(Average = mean(as.numeric(total_sq_kilometers)))
+```
+
+```{r}
+ggplot(American_and_Brit_parks, aes(x=country, y=Average)) + geom_col() + labs(x="Nations",y="Average Park Size in Kilometers") + ggtitle("American vs. British Parks: Size Comparisons") 
+```
+
+```{r}
+Brit_and_European_parks <- parks %>%
+  select(country, park, total_sq_kilometers, year) %>%
+  filter(country != "United States" & country != "Canada" & country != "New Zealand" & country != "South Africa") %>%
+  group_by(country, year) %>%
+  summarize(Count = n())
+```
+
+```{r}
+ggplot(Brit_and_European_parks, aes(x=year, y=Count)) + geom_line() + labs(x="Year", y="Number of Parks") + ggtitle("Number of Parks Over Time: UK Compared to Europe") + facet_wrap("country")
+
+#Line charts seem like a good idea re: park ages and how many there are, as they show both the dates when nations first established their parks (ex: compare the visualizations for Romania and the UK) and how many were added in subsequent years. They would make it possible to do some quick comparisons.
+```
+
+```{r}
+American_and_Brit_parks <- parks %>%
+  select(country, park, total_sq_kilometers, year) %>%
+  filter(country == "United States" | country == "United Kingdom") %>%
+  group_by(country, year) %>%
+  summarize(Count = n())
+```
+
+```{r}
+ggplot(American_and_Brit_parks, aes(x=year, y=Count)) + geom_line() + labs(x="Year", y="Number of Parks") + ggtitle("Number of Parks Over Time: America Compared to UK") + facet_wrap("country")
+```
+
+```{r}
+American_parks <- parks %>%
+  select(park, lon, lat, country, distance_from_closest_city) %>%
+  filter(country == "United States")
+```
+
+```{r}
+leaflet(data=American_parks) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste(American_parks$park , " is ", American_parks$distance_from_closest_city, " miles from the closest city", sep=""))
+```
+
+```{r}
+park_distances <- parks %>%
+  select(park, country, distance_from_closest_city) %>%
+  group_by(country) %>%
+  summarize(Avg = mean(as.numeric(distance_from_closest_city)))
+```
+
+```{r}
+ggplot(park_distances, aes(x=country, y=Avg)) + geom_col() + labs(x="Nations",y="Distance in Kilometers") + ggtitle("Average Distance Between Parks and Nearest Cities") + theme(axis.text.x = element_text(angle = 90))
+
+#This chart should be used in combination with the leaflets, which provide exact distances for each park listed in the dataset and offer a navigable visualization of where parks are located. (Since this is a question of proximity, I don't think it should be represented with a chart only.) The bar chart is more for *general* observations. It includes *all* countries listed in the dataset, as I did not feel the need to separate them here. 
+```
+
+```{r}
+Remaining_parks <- parks %>%
+  select(country, park, total_sq_kilometers, year) %>%
+  filter(country == "United Kingdom" | country == "New Zealand" | country == "South Africa" | country == "Canada") %>%
+  group_by(country) %>%
+  summarize(Average = mean(as.numeric(gsub(",", "", total_sq_kilometers))))
+```
+
+```{r}
+ggplot(Remaining_parks, aes(x=country, y=Average)) + geom_col() + labs(x="Nations",y="Average Park Size in Kilometers") + ggtitle("UK, New Zealand, Canada & South Africa: Park Size Comparisons") 
+```
+
+```{r}
+Remaining_parks_timelines <- parks %>%
+  select(country, park, total_sq_kilometers, year) %>%
+  filter(country == "United Kingdom" | country == "New Zealand" | country == "South Africa" | country == "Canada") %>%
+  group_by(country, year) %>%
+  summarize(Count = n())
+```
+```{r}
+ggplot(Remaining_parks_timelines, aes(x=year, y=Count)) + geom_line() + labs(x="Year", y="Number of Parks") + ggtitle("Number of Parks Over Time") + facet_wrap("country")
+```
+
+```{r}
+Canada_parks <- parks %>%
+  select(country, park, lon, lat, distance_from_closest_city) %>%
+  filter(country == "Canada")
+```
+```{r}
+leaflet(data=Canada_parks) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste(Canada_parks$park , " is ", Canada_parks$distance_from_closest_city, " miles from the closest city", sep=""))
+```
+```{r}
+New_Zealand_parks <- parks %>%
+  select(country, park, lon, lat, distance_from_closest_city) %>%
+  filter(country == "New Zealand")
+
+leaflet(data=New_Zealand_parks) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste(New_Zealand_parks$park , " is ", New_Zealand_parks$distance_from_closest_city, " miles from the closest city", sep=""))
+```
+
+```{r}
+South_Africa_parks <- parks %>%
+  select(country, park, lon, lat, distance_from_closest_city) %>%
+  filter(country == "South Africa")
+
+leaflet(data=South_Africa_parks) %>% addTiles() %>% addMarkers(~lon, ~lat, popup = paste(South_Africa_parks$park , " is ", South_Africa_parks$distance_from_closest_city, " miles from the closest city", sep=""))
+```
+
+>I've probably taken this exercise too far, but based on the questions Dr. B has posited, it seems like the best means of visualizing her data would be through a combination of leaflets, line charts, and bar charts. Leaflets make it possible to track down minutiae (ex: I want to know how far Mokala park in South Africa is from the nearest city), while the charts offer broader observations/conclusions.
