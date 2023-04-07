@@ -1,7 +1,7 @@
 ---
 title: 'Worksheet 6: Text Analysis'
 author: 'David Williams'
-date: ''
+date: 'April 7, 2023'
 ---
 
 _This is the sixth in a series of worksheets for History 8510 at Clemson University. The goal of these worksheets is simple: practice, practice, practice. The worksheet introduces concepts and techniques and includes prompts for you to practice in this interactive document. When you are finished, you should change the author name (above), knit your document, and upload it to canvas. Don't forget to commit your changes as you go and push to github when you finish the worksheet._
@@ -195,7 +195,7 @@ tidy_sotu <- sotu_whole %>%
 ```
 (@) Before we move forward, take a minute a describe the chunk of code you just ran. What does each section do and how does it reflect the workflow for a topic modeling project? What are the important steps that are unique to topic modeling? 
 
->
+>Converting the metadata into a dataset is an important step in preparing for textual analysis, as it allows one to tidy the data from there. It is also necessary to create a directory where all of the *texts* will be deposited. After this step, we use "readtext" to import and read the plethora of text files. The "bind_cols" function is particularly crucial for textual analysis because it allows the user to join metadata and texts. The newly created dataset can then be tokenized (i.e., broken down into its small components). Filtering out stop_words is also important because it significantly condenses the amount of data we're searching, which aids topic modeling by ensuring that we only encounter significant terms. We are now ready to perform a text analysis. :) 
 
 
 The most basic kind of analysis we might be interested in doing is counting words. We can do that easily using the `count()` function: 
@@ -234,7 +234,7 @@ tidy_sotu %>%
 
 (@) Think back to the metadata that we loaded about these speeches. Why are more modern president's state of the union addresses shorter? 
 
->It appears that most SOTU addresses given by modern presidents are speeches, whereas a lot of earlier presidents rendered theirs in writing. 
+>It appears that most SOTU addresses given by modern presidents are speeches, whereas a lot of earlier presidents rendered theirs in *writing.* At present, this is the only disparity I'm noticing. 
 
 (@) Filter the dataset to address this discrepancy and the recreate these statistics: 
 ```{r}
@@ -255,6 +255,7 @@ spoken_sotu <- tidy_sotu %>%
   arrange(desc(avg_words))
 ```
 
+>I'm not certain if I'm anywhere near the correct answer, but this is all I've been able to come up with to this point. There cerainly appears to be a length disparity between written and spoken State of the Union addresses. 
 
 ### Term Frequency
 Often, the raw frequency of a term is not as useful as relative frequency. In other words, how often that word appears relative to the total number of words in a text. This ratio is called **term frequency**. 
@@ -283,7 +284,7 @@ tidy_sotu %>%
 ```
 (@) The code above is commented to help you follow it. Walk through the code above, and explain what each line does in your own words. If its a function you are unfamiliar with, look up the documentation.
 
->INSERT ANSWER HERE.
+>The first line ("count") tallies the number of occurrences for individual words, which are then grouped by the presidents giving the addresses. From there, a new column is added ("mutate") that divides the numbers of word occurrences by the word totals in the docs to determine rates of frequency. The output is then arranged from words appearing most frequently to the least, after which "top_n" is used to identify the top word for each president's SOTU address.
 
 ### TF-IDF
 
@@ -338,7 +339,7 @@ Reagan_tf_idf <- tidy_sotu %>%
 
 head(Reagan_tf_idf)
 ```
->THIS IS WHERE YOU NEED TO PUT YOUR ANSWER. 
+>Among the most frequent terms in the raw count are "programs," "government," and "tax." These are very telling, as Regean was known to be especially critical of the public sector, favoring minial government assistance. (For the record, I am NOT a fan of Reagan's policies/politics.) This political outlook is largely what his administration was built on, that and his economic policies that eventually led to the creation of the term "Reagannomics" (hence the word "tax" appearing so often). The tf_idf also yields interesting results, as two of the terms that appear near the top of the list are "100th" and "constitution." These both appear most often in Reagan's 1987 SOTU address. That was the 100th Congress of the United States, and Reagan almost certainly made it a priority to highlight this fact in his speech, including repeated references to the constitution. (This would also make sense given that Reagan was a bona fide federalist in mindset and practice.)  
 
 ### Co-Occurance
 Co-occurrence gives us a sense of words that appear in the same text, but not necessarily next to each other. It shows words that are likely to co-occur. Note that this is different than topic modeling, which we'll discuss next week. 
@@ -396,13 +397,55 @@ unzip("MindAndBody.zip")
 metadata <- read.csv("https://raw.githubusercontent.com/regan008/8510-TextAnalysisData/main/mb-metadata.csv")
 ```
 (@) Add code chunks below and intersperse text to explain what you are doing and why. 
-```{r}
-library(readtext)
-library(tidytext)
-library(tidyverse)
 
-file_paths <- list.files("MindAndBody/")
-MAB <- readtext(paste("MindAndBody/", file_paths, sep=""))  
+```{r}
+file_paths <- list.files("txt/") #creating a directory for the text files
+Mind_and_Body <- readtext(paste("txt/", file_paths, sep="")) #import the text files, read them, and deposit them in the directory
 ```
+
+```{r}
+Mind_and_Body$doc_id <- gsub("MB_", "", Mind_and_Body$doc_id) #modifying the observations under the doc_id variable so that metadata and Mind_and_Body can be joined easily
+```
+
+```{r}
+MAB <- full_join(metadata, Mind_and_Body, by = c("Filename" = "doc_id")) #joining the metadata with the text
+```
+
+```{r}
+MAB_words <- MAB %>%
+  unnest_tokens(word, text) #tokenize the dataset to prep it for analysis
+
+MAB_words
+```
+
+```{r}
+MAB_words <- MAB_words %>%
+  filter(str_detect(word, "[a-z']$")) %>% #ensuring that only words are included in the count and numbers are excluded
+  anti_join(stop_words) #removing stop words
+```
+
+```{r}
+MAB.tf.idf <- MAB_words %>%
+  count(Filename, word, sort = TRUE)  %>%  
+  bind_tf_idf(word, Filename, n) %>%
+  arrange(tf_idf)
+
+head(MAB.tf.idf) 
+
+#The tf_idf is arranged in ascending order so that I may get a sense of which terms are more significant for the entire corpus of texts. The words with a tf_idf of 0 appear most frequently. 
+```
+
+```{r}
+MAB_words %>%
+  count(Year, word)  %>%  
+  group_by(Year) %>%
+  top_n(1) #identifies the top word for each year
+
+#The purpose of this code is to see which word popped up most frequently from year to year, to see if there is a trend to be noticed. 
+```
+
+>The raw word count by year is interesting here, as there is a shift from "physical" to "health" as we get closer to the 1930s. This would lead me to conclude that conversations/writings about health evolved over time from a singular focus on physical health to considerations of overall wellness in general. The tf_idf output illustrates a clear relationship between education and physical wellness. Education was likely noted as a crucial step towards living a healthier life, or these texts may have discussed the importance of physical wellness being taught in academic settings (the word "school" appears often in the corpus of texts). Either way, health and education are viewed as near synonymous based on how often both are cited. 
+
+
 
 
