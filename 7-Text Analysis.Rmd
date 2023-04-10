@@ -134,6 +134,8 @@ unzip("MB.zip")
 metadata <- read.csv("https://raw.githubusercontent.com/regan008/8510-TextAnalysisData/main/mb-metadata.csv")
 ```
 
+>I've added annotations throughout to explain my process and decisions. I know the worksheet question does not explicity ask us to do this, so I hope it's OK!
+
 (@) What happens if you create a custom stopword list? How does this change the model?
 ```{r}
 file_paths <- list.files("txt/") 
@@ -216,8 +218,8 @@ MaB_docs %>%  filter(document == "1917_Sept.txt") %>% arrange(desc(gamma))
 
 ```{r}
 Mab_wordcloud <- MaB.topics %>% filter(topic == 2)
-wordcloud(topic1$term, topic1$beta, max.words = 10, random.order = FALSE,
-    rot.per = 0.3, colors = brewer.pal(6, "Dark2"))
+wordcloud(topic1$term, topic1$beta, max.words = 40, random.order = FALSE,
+    rot.per = 0.3, colors = brewer.pal(4, "Dark2"), scale = c(2, .5)) #I thought it might be beneficial to create a wordcloud for a single topic to see what observation(s) I might come up with. What I find interesting is the prominence of the term "playground," which might warrant a closer examination as to how often, and in what context, this publication discussed schools. 
 ```
 
 
@@ -239,7 +241,7 @@ MaB1920s.dtm <- MaB_20s_words %>%
   count(Filename, word) %>% 
   cast_dtm(Filename, word, n)
 
-MaB1920s.lda <- LDA(MaB1920s.dtm, k = 25, control = list(seed = 12345))
+MaB1920s.lda <- LDA(MaB1920s.dtm, k = 35, control = list(seed = 12345)) #I wanted to see if increasing the number of topics would yield even more specific terms that I could work with. 
 MaB1920s.lda
 
 MaB20_topics <- tidy(MaB1920s.lda, matrix = "beta")
@@ -248,7 +250,7 @@ MaB20_topics
 ```{r}
 MaB1920s_top_terms <- MaB20_topics %>%
   group_by(topic) %>%
-  top_n(3, beta)
+  top_n(5, beta)
 
 MaB1920s_top_terms %>%
   mutate(term = reorder_within(term, beta, topic)) %>%
@@ -262,6 +264,6 @@ MaB1920s_top_terms %>%
 MaB1920s_docs <- tidy(MaB1920s.lda, matrix = "gamma")
 MaB1920s_docs
 ```
->THIS IS YOUR STOPPING POINT. 
+>Narrowing my topic model down to a single decade gives me a clearer picture of which topics were most in vogue during that time. Specifically, two terms that pop up during this topic model that didn't appear in the previous one were "anthropometrics" (the study of variations in the sizes of human bodies) and "heredity." Given how prominent the controversial field of eugenics was in society and medicine at the time--to my understanding, the height of eugenics was from the late nineteenth century to about the 1950s--it would be worthwhile to look and see if any issues of Mind and Body tap into this conversation. 
 
 This was the final worksheet for this class. You did it - you learned to code in R! Congrats!
